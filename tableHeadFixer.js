@@ -1,4 +1,10 @@
-(function($) {
+/*!
+TableHeadFixer plugin for JQuery
+Version 1.0.0
+Copyright (C) 2016 Lai Xuancheng <lai32690@gmail.com>
+License MIT
+*/
+(function($,window) { "$:nomunge,window:nomunge";
 
 	$.fn.tableHeadFixer = function(param) {
 		var defaults = {
@@ -13,7 +19,7 @@
 
 		return this.each(function() {
 			settings.table = this;
-			settings.parent = $(settings.table).parent();
+			settings.parent = $(this).parent();
 			setParent();
 
 			if(settings.head == true)
@@ -28,7 +34,7 @@
 			if(settings.right > 0)
 				fixRight();
 
-			setCorner();
+			setCorner(settings,window);
 
 			$(settings.parent).trigger("scroll");
 
@@ -38,55 +44,85 @@
 		});
 
 		/*
-		 This function solver z-index problem in corner cell where fix row and column at the same time,
-		 set corner cells z-index 1 more then other fixed cells
-		 */
-		function setCorner() {
-			var table = $(settings.table);
+		Create and position table(s) of cloned cells where row(s) and column(s) are both fixed
+		*/
+		function setCorner(settings,window) {
+			var collect = null;
+			var rows;
 
 			if(settings.head) {
-				if(settings.left > 0) {
-					var tr = table.find("thead tr");
-
-					tr.each(function(k, row) {
-						solverLeftColspan(row, function(cell) {
-							$(cell).css("z-index", settings['z-index'] + 1);
-						});
-					});
-				}
-
-				if(settings.right > 0) {
-					var tr = table.find("thead tr");
-
-					tr.each(function(k, row) {
-						solveRightColspan(row, function(cell) {
-							$(cell).css("z-index", settings['z-index'] + 1);
-						});
-					});
+				if(settings.left > 0 || settings.right > 0) {
+					rows = $(settings.table).find("thead tr");
+					if(rows.length > 0) {
+						collect = $();
+						if(settings.left > 0) {
+							rows.each(function(k, r) {
+								solveLeftColspan(r, function(cell) {
+									collect = collect.add(cell);
+								});
+							});
+						}
+						if(settings.right > 0) {
+							rows.each(function(k, r) {
+								solveRightColspan(r, function(cell) {
+									collect = collect.add(cell);
+								});
+							});
+						}
+					}
 				}
 			}
 
 			if(settings.foot) {
-				if(settings.left > 0) {
-					var tr = table.find("tfoot tr");
-
-					tr.each(function(k, row) {
-						solverLeftColspan(row, function(cell) {
-							$(cell).css("z-index", settings['z-index']);
-						});
-					});
-				}
-
-				if(settings.right > 0) {
-					var tr = table.find("tfoot tr");
-
-					tr.each(function(k, row) {
-						solveRightColspan(row, function(cell) {
-							$(cell).css("z-index", settings['z-index']);
-						});
-					});
+				if(settings.left > 0 || settings.right > 0) {
+					rows = $(settings.table).find("tfoot tr");
+					if(rows.length > 0) {
+						if(!collect) {
+							collect = $();
+						}
+						if(settings.left > 0) {
+							rows.each(function(k, r) {
+								solveLeftColspan(r, function(cell) {
+									collect = collect.add(cell);
+								});
+							});
+						}
+						if(settings.right > 0) {
+							rows.each(function(k, r) {
+								solveRightColspan(r, function(cell) {
+									collect = collect.add(cell);
+								});
+							});
+						}
+					}
 				}
 			}
+			
+			if (collect && collect.length > 0) {
+				//how is transparent background reported?
+				var ob = $('<div style="background:none;display:none;"/>').appendTo($(settings.parent));
+				var transstyle = ob.css('background-color');
+				ob.remove();
+
+				collect.each(function(k, cell) {
+					ensureBackground(cell, transstyle);
+				}).css('z-index', settings['z-index'] + 1);
+//				settings.cornercells = collect;
+			}
+		}
+
+		function ensureBackground(cell, transstyle) {
+			for (var current = cell; current != null; current = current.parentElement) {
+				var background = $(current).css('background-color');
+
+				if(background && background !== transstyle) {
+					if(current != cell) {
+						$(cell).css('background-color', background);
+					}
+					return;
+				}
+			}
+			$(cell).css('background-color', '#FFF');
 		}
 
 		// Set style of table parent
@@ -94,147 +130,88 @@
 			var parent = $(settings.parent);
 			var table = $(settings.table);
 
-			parent.append(table);
-			parent
-				.css({
-					'overflow-x' : 'auto',
-					'overflow-y' : 'auto'
-				});
-
-			parent.scroll(function() {
-				var scrollWidth = parent[0].scrollWidth;
-				var clientWidth = parent[0].clientWidth;
-				var scrollHeight = parent[0].scrollHeight;
-				var clientHeight = parent[0].clientHeight;
+			parent.append(table)
+			.css({
+				'overflow' : 'auto',
+				'overflow-x' : 'auto',
+				'overflow-y' : 'auto'
+			})
+			.scroll(function() {
+				var pob = settings.parent;
+				var scrollWidth = pob.scrollWidth;
+				var clientWidth = pob.clientWidth;
+				var scrollHeight = pob.scrollHeight;
+				var clientHeight = pob.clientHeight;
 				var top = parent.scrollTop();
+				var bottom = scrollHeight - clientHeight - top
 				var left = parent.scrollLeft();
+				var right = scrollWidth - clientWidth - left;
 
+				//TODO support multi-row header
 				if(settings.head)
 					this.find("thead tr > *").css("top", top);
-
-				if(settings.foot)
-					this.find("tfoot tr > *").css("bottom", scrollHeight - clientHeight - top);
-
+				//TODO support settings.left > 1
 				if(settings.left > 0)
 					settings.leftColumns.css("left", left);
-
+				//TODO support settings.right > 1
 				if(settings.right > 0)
-					settings.rightColumns.css("right", scrollWidth - clientWidth - left);
-			}.bind(table));
+					settings.rightColumns.css("right", right);
+				//TODO support multi-row footer
+				if(settings.foot)
+					this.find("tfoot tr > *").css("bottom", bottom);
+			}
+			.bind(table));
 		}
 
-		// Set table head fixed
+		// Setup fixed head
 		function fixHead () {
-			var thead = $(settings.table).find("thead");
-			var tr = thead.find("tr");
-			var cells = thead.find("tr > *");
+			var cells = $(settings.table).find('thead tr > *');
 
-			setBackground(cells);
-			cells.css({
-				'position' : 'relative'
-			});
+			cells.css('position', 'relative');
 		}
 
-		// Set table foot fixed
+		// Setup fixed foot
 		function fixFoot () {
-			var tfoot = $(settings.table).find("tfoot");
-			var tr = tfoot.find("tr");
-			var cells = tfoot.find("tr > *");
+			var cells = $(settings.table).find('tfoot tr > *');
 
-			setBackground(cells);
-			cells.css({
-				'position' : 'relative'
-			});
+			cells.css('position', 'relative');
 		}
 
-		// Set table left column fixed
+		// Setup fixed left column(s)
 		function fixLeft () {
-			var table = $(settings.table);
+			var rows = $(settings.table).find("tr");
+			var collect = $();
 
-			// var fixColumn = settings.left;
-
-			settings.leftColumns = $();
-
-			var tr = table.find("tr");
-			tr.each(function(k, row) {
-
-				solverLeftColspan(row, function(cell) {
-					settings.leftColumns = settings.leftColumns.add(cell);
-				});
-				// var inc = 1;
-
-				// for(var i = 1; i <= fixColumn; i = i + inc) {
-				// 	var nth = inc > 1 ? i - 1 : i;
-
-				// 	var cell = $(row).find("*:nth-child(" + nth + ")");
-				// 	var colspan = cell.prop("colspan");
-
-				// 	settings.leftColumns = settings.leftColumns.add(cell);
-
-				// 	inc = colspan;
-				// }
-			});
-
-			var column = settings.leftColumns;
-
-			column.each(function(k, cell) {
-				var cell = $(cell);
-
-				setBackground(cell);
-				cell.css({
-					'position' : 'relative'
+			rows.each(function(k, r) {
+				solveLeftColspan(r, function(cell) {
+					collect = collect.add(cell);
 				});
 			});
+
+			if(collect.length > 0) {
+				collect.css('position', 'relative');
+				settings.leftColumns = collect;
+			}
 		}
 
-		// Set table right column fixed
+		// Setup fixed right column(s)
 		function fixRight () {
-			var table = $(settings.table);
+			var rows = $(settings.table).find("tr");
+			var collect = $();
 
-			var fixColumn = settings.right;
-
-			settings.rightColumns = $();
-
-			var tr = table.find("tr");
-			tr.each(function(k, row) {
-				solveRightColspan(row, function(cell) {
-					settings.rightColumns = settings.rightColumns.add(cell);
+			rows.each(function(k, r) {
+				solveRightColspan(r, function(cell) {
+					collect = collect.add(cell);
 				});
 			});
 
-			var column = settings.rightColumns;
-
-			column.each(function(k, cell) {
-				var cell = $(cell);
-
-				setBackground(cell);
-				cell.css({
-					'position' : 'relative'
-				});
-			});
-
+			if(collect.length > 0) {
+				collect.css('position', 'relative');
+				settings.rightColumns = collect;
+			}
 		}
 
-		// Set fixed cells backgrounds
-		function setBackground(elements) {
-			elements.each(function(k, element) {
-				var element = $(element);
-				var parent = $(element).parent();
-
-				var elementBackground = element.css("background-color");
-				elementBackground = (elementBackground == "transparent" || elementBackground == "rgba(0, 0, 0, 0)") ? null : elementBackground;
-
-				var parentBackground = parent.css("background-color");
-				parentBackground = (parentBackground == "transparent" || parentBackground == "rgba(0, 0, 0, 0)") ? null : parentBackground;
-
-				var background = parentBackground ? parentBackground : "white";
-				background = elementBackground ? elementBackground : background;
-
-				element.css("background-color", background);
-			});
-		}
-
-		function solverLeftColspan(row, action) {
+		function solveLeftColspan(row, action) {
 			var fixColumn = settings.left;
 			var inc = 1;
 
@@ -269,7 +246,7 @@
 		}
 	};
 
-})(jQuery);
+})(jQuery,window);
 
 /*  cellPos jQuery plugin
     ---------------------
@@ -280,7 +257,7 @@
             $(this).text( $(this).cellPos().top +", "+ $(this).cellPos().left );
         });
 */
-(function($){
+(function($){ "$:nomunge";
     /* scan individual table and set "cellPos" data in the form { left: x-coord, top: y-coord } */
     function scanTable( $table ) {
         var m = [];
