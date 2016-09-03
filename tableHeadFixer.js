@@ -1,6 +1,6 @@
 /*!
 TableHeadFixer plugin for JQuery
-Version 1.0.0
+Version 1.1.0
 Copyright (C) 2016 Lai Xuancheng <lai32690@gmail.com>
 License MIT
 */
