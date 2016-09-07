@@ -12,6 +12,7 @@ License MIT
 			foot: false,
 			left: 0,
 			right: 0,
+			styledelay: 20,
 			'z-index': 0
 		};
 		var settings = $.extend({}, defaults, param);
@@ -96,30 +97,29 @@ License MIT
 			}
 			
 			if (collect && collect.length > 0) {
-				//how is transparent background reported?
-				var ob = $('<div style="background:none;display:none;"/>').appendTo($(settings.parent));
-				var transstyle = ob.css('background-color');
-				ob.remove();
-
-				collect.each(function(k, cell) {
-					ensureBackground(cell, transstyle);
-				}).css('z-index', settings['z-index'] + 1);
 //				settings.cornercells = collect;
-			}
-		}
+				setTimeout(function() {
+					//how is transparent background reported?
+					var ob = $('<div style="background:none;display:none;"/>').appendTo($(settings.parent));
+					var transstyle = ob.css('background-color');
 
-		function ensureBackground(cell, transstyle) {
-			for (var current = cell; current != null; current = current.parentElement) {
-				var background = $(current).css('background-color');
+					ob.remove();
+					collect.each(function(k, cell) {
+						//ensure a non-transparent background
+						for (var current = cell; current != null; current = current.parentElement) {
+							var background = $(current).css('background-color');
 
-				if(background && background !== transstyle) {
-					if(current != cell) {
-						$(cell).css('background-color', background);
-					}
-					return;
-				}
+							if(background && background !== transstyle) {
+								if(current != cell) {
+									$(cell).css('background-color', background);
+								}
+								return;
+							}
+						}
+						$(cell).css('background-color', '#FFF');
+					}).css('z-index', settings['z-index'] + 1);
+				}, settings.styledelay);
 			}
-			$(cell).css('background-color', '#FFF');
 		}
 
 		// Setup table in parent
